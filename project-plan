@@ -1,0 +1,47 @@
+# WIP
+
+# Projektplan – Accessibility Scanner
+
+## 1. Projektbeskrivning
+
+AccessTrack är en webbaserad plattform för automatiserad och manuell tillgänglighetsgranskning av webbplatser.
+
+Applikationen ska låta användare ange en URL, genomföra automatiska tillgänglighetstester och få en sammanställning av identifierade problem. Resultaten ska sparas så att användaren kan granska tidigare skanningar och följa upp tillgänglighetsproblem.
+
+Projektets huvudsakliga tekniska fokus ligger på att undersöka hur Playwright och axe-core kan integreras med ASP.NET Core för att automatisera tillgänglighetsgranskning.
+
+## 2. Bakgrund och problemformulering
+
+Digital tillgänglighet är viktigt för att webbplatser ska kunna användas av så många människor som möjligt.
+
+Tillgänglighetsgranskning kan vara tidskrävande och kräver både automatiska och manuella kontroller. Det finns därför ett behov av verktyg som hjälper utvecklare att identifiera, dokumentera och följa upp tillgänglighetsproblem.
+
+## 3. Syfte
+
+Syftet är att utveckla en fungerande fullstackapplikation för tillgänglighetsgranskning och samtidigt undersöka möjligheter och begränsningar med automatiserade WCAG-tester.
+
+## 4. Projektmål
+
+- Utveckla en skanningsmotor med Playwright och axe-core.
+- Bygga ett ASP.NET Core Web API.
+- Lagra skanningsresultat i en relationsdatabas.
+- Utveckla ett webbgränssnitt i React/Next.js.
+- Presentera identifierade tillgänglighetsproblem.
+- Möjliggöra manuell granskning av utvalda tillgänglighetskriterier.
+- Testa och dokumentera lösningens funktionalitet och begränsningar.
+
+## 5. Avgränsningar
+
+Projektet ska endast stödja skanning av enskilda webbsidor. Ingen automatisk crawling av hela webbplatser ska implementeras.
+
+Första versionen ska inte innehålla användarregistrering, avancerad behörighetshantering eller schemalagda skanningar.
+
+Automatiska tester ska inte presenteras som ett fullständigt bevis på att en webbplats uppfyller WCAG.
+
+## 6. Projektförutsättningar
+
+- Projekttid: 4 veckor på heltid, cirka 160 timmar.
+- Projektform: Individuellt arbete.
+- Versionshantering: Git och GitHub.
+- Projektstyrning: GitHub Projects.
+- Dokumentation: README, projektdagbok, testdokumentation och projektrapport.
