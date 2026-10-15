@@ -1,47 +1,279 @@
 # WIP
 
-# Projektplan – Accessibility Scanner
+# Projektplan – Password Vault
 
 ## 1. Projektbeskrivning
 
-AccessTrack är en webbaserad plattform för automatiserad och manuell tillgänglighetsgranskning av webbplatser.
+Projektet går ut på att utveckla en lösenordshanterare (Password Vault) som desktopapplikation med C# och .NET.
 
-Applikationen ska låta användare ange en URL, genomföra automatiska tillgänglighetstester och få en sammanställning av identifierade problem. Resultaten ska sparas så att användaren kan granska tidigare skanningar och följa upp tillgänglighetsproblem.
+Applikationen ska göra det möjligt för användaren att lagra och hantera lösenord i ett lokalt, krypterat valv som skyddas av ett huvudlösenord.
 
-Projektets huvudsakliga tekniska fokus ligger på att undersöka hur Playwright och axe-core kan integreras med ASP.NET Core för att automatisera tillgänglighetsgranskning.
+Projektet kommer att fokusera på säker lagring av känslig information, kryptering, applikationsarkitektur och utveckling av ett användarvänligt gränssnitt.
+
+Applikationen ska i första hand utvecklas för Windows, men arkitekturen ska utformas så att kärnlogiken kan återanvändas i en framtida mobilapplikation.
 
 ## 2. Bakgrund och problemformulering
 
-Digital tillgänglighet är viktigt för att webbplatser ska kunna användas av så många människor som möjligt.
+Många användare har konton på ett stort antal webbplatser och tjänster. Att komma ihåg unika och starka lösenord för varje konto kan vara svårt, vilket kan leda till återanvändning av lösenord eller osäker förvaring.
 
-Tillgänglighetsgranskning kan vara tidskrävande och kräver både automatiska och manuella kontroller. Det finns därför ett behov av verktyg som hjälper utvecklare att identifiera, dokumentera och följa upp tillgänglighetsproblem.
+En lösenordshanterare kan underlätta detta genom att samla användarens inloggningsuppgifter i ett krypterat valv.
+
+Projektet ska undersöka hur en sådan applikation kan utvecklas med C# och .NET, med särskilt fokus på kryptering, nyckelhantering och säker lokal datalagring.
+
+**Problemformulering:**
+
+Hur kan en lokal lösenordshanterare utvecklas med C# och .NET för att lagra och hantera känsliga uppgifter på ett krypterat och användarvänligt sätt?
 
 ## 3. Syfte
 
-Syftet är att utveckla en fungerande fullstackapplikation för tillgänglighetsgranskning och samtidigt undersöka möjligheter och begränsningar med automatiserade WCAG-tester.
+Syftet med projektet är att fördjupa mina kunskaper inom C# och .NET genom att utveckla en desktopapplikation med särskilt fokus på säkerhet.
+
+Projektet ska ge praktisk erfarenhet av:
+
+- Kryptering och nyckelhantering.
+- Applikationsarkitektur och separation av ansvar.
+- Lokal datalagring med SQLite.
+- Desktoputveckling med Avalonia UI.
+- Testning och felhantering.
+- Självständigt projektarbete, planering och dokumentation.
 
 ## 4. Projektmål
 
-- Utveckla en skanningsmotor med Playwright och axe-core.
-- Bygga ett ASP.NET Core Web API.
-- Lagra skanningsresultat i en relationsdatabas.
-- Utveckla ett webbgränssnitt i React/Next.js.
-- Presentera identifierade tillgänglighetsproblem.
-- Möjliggöra manuell granskning av utvalda tillgänglighetskriterier.
-- Testa och dokumentera lösningens funktionalitet och begränsningar.
+Målet är att utveckla en fungerande desktopapplikation där användaren kan skapa ett lösenordsvalv, låsa upp det med ett huvudlösenord och hantera sina sparade lösenord.
 
-## 5. Avgränsningar
+### Huvudmål
 
-Projektet ska endast stödja skanning av enskilda webbsidor. Ingen automatisk crawling av hela webbplatser ska implementeras.
+- Skapa och öppna ett lokalt lösenordsvalv.
+- Skydda valvet med ett huvudlösenord.
+- Kryptera känsliga uppgifter innan de sparas.
+- Kunna skapa, läsa, redigera och ta bort lösenordsposter.
+- Lagra informationen lokalt så att den finns kvar efter omstart.
+- Utveckla ett användarvänligt grafiskt gränssnitt.
+- Genomföra tester av säkerhetskritiska funktioner.
 
-Första versionen ska inte innehålla användarregistrering, avancerad behörighetshantering eller schemalagda skanningar.
+### Önskade tilläggsfunktioner
 
-Automatiska tester ska inte presenteras som ett fullständigt bevis på att en webbplats uppfyller WCAG.
+- Lösenordsgenerator.
+- Sökning och sortering.
+- Automatisk låsning vid inaktivitet.
+- Kopiering av lösenord till urklipp.
+- Krypterad export och import av valv.
+- Möjlighet att byta huvudlösenord.
+- Säkerhetsöversikt över sparade lösenord.
 
-## 6. Projektförutsättningar
+## 5. Avgränsningar och prioritering
 
-- Projekttid: 4 veckor på heltid, cirka 160 timmar.
-- Projektform: Individuellt arbete.
-- Versionshantering: Git och GitHub.
-- Projektstyrning: GitHub Projects.
-- Dokumentation: README, projektdagbok, testdokumentation och projektrapport.
+Projektet genomförs individuellt under fyra veckor. Därför kommer funktionerna att prioriteras enligt MoSCoW-metoden.
+
+### Must have
+
+- Skapa ett nytt lösenordsvalv.
+- Ange och verifiera huvudlösenord.
+- Låsa och låsa upp valvet.
+- Kryptera och dekryptera känsliga uppgifter.
+- Säker nyckelhärledning och hantering av salt och nonce.
+- Lokal lagring med SQLite.
+- Skapa, visa, redigera och ta bort lösenordsposter.
+- Grundläggande desktopgränssnitt.
+- Hantering av felaktiga lösenord och korrupt data.
+- Grundläggande funktionella tester och säkerhetstester.
+
+### Should have
+
+- Lösenordsgenerator.
+- Sökning bland sparade poster.
+- Visa och dölja lösenord.
+- Kopiering till urklipp.
+- Automatisk låsning efter inaktivitet.
+- Byte av huvudlösenord.
+- Krypterad säkerhetskopiering.
+
+### Could have
+
+- Kategorier och favoriter.
+- Lösenordsstyrkeindikator.
+- Identifiering av återanvända lösenord.
+- Säkerhetsdashboard.
+- Biometrisk upplåsning.
+- Mobilapplikation.
+
+### Won't have – inom projektperioden
+
+- Molnsynkronisering mellan enheter.
+- Webbläsartillägg och automatisk ifyllning.
+- Delning av lösenord mellan användare.
+- Fullständigt stöd för flera användarkonton.
+- Egenutvecklade kryptografiska algoritmer.
+
+Prioriteringarna kan ändras under projektets gång beroende på tidsåtgång och tekniska utmaningar. Säkerhet och fungerande kärnfunktionalitet kommer alltid att prioriteras före extrafunktioner.
+
+## 6. Teknikval
+
+| Teknik | Användningsområde |
+|---|---|
+| C# / .NET | Applikationslogik |
+| Avalonia UI | Grafiskt desktopgränssnitt |
+| MVVM | Struktur för UI och logik |
+| SQLite | Lokal datalagring |
+| EF Core | Databasåtkomst, om det passar lagringslösningen |
+| AES-256-GCM | Autentiserad kryptering |
+| Argon2id | Nyckelhärledning från huvudlösenord |
+| xUnit | Automatiserade tester |
+| Git / GitHub | Versionshantering |
+| GitHub Projects | Planering och uppföljning |
+
+Krypteringen ska implementeras med etablerade bibliotek och metoder. Inga egna kryptografiska algoritmer ska utvecklas.
+
+Det exakta upplägget för valvformat, kryptering och nyckelhantering ska undersökas och dokumenteras innan säkerhetslogiken implementeras.
+
+## 7. Föreslagen arkitektur
+
+Applikationen delas upp i separata ansvarsområden för att göra koden lättare att underhålla och testa.
+
+**PasswordVault.Desktop**
+
+Ansvarar för användargränssnittet, navigation och användarinteraktion.
+
+**PasswordVault.Core**
+
+Innehåller applikationens kärnlogik, modeller och tjänster för hantering av valvet och lösenordsposter.
+
+**PasswordVault.Security**
+
+Ansvarar för kryptering, dekryptering, nyckelhärledning och andra säkerhetsrelaterade funktioner.
+
+**PasswordVault.Storage**
+
+Ansvarar för lagring och hämtning av krypterad information.
+
+**PasswordVault.Tests**
+
+Innehåller automatiserade tester för kärnlogik, kryptering och lagring.
+
+Arkitekturen ska göra det möjligt att återanvända kärnlogiken i andra klienter, exempelvis en framtida mobilapplikation.
+
+## 8. Tidsplan
+
+Projektet genomförs under fyra veckor, motsvarande cirka 160 arbetstimmar.
+
+### Vecka 1 – Grundstruktur och säkerhetsprototyp
+
+- Skapa projektstruktur och GitHub-repository.
+- Sätta upp GitHub Projects och Issues.
+- Undersöka kryptering och nyckelhärledning.
+- Bestämma grundläggande arkitektur och valvformat.
+- Implementera en prototyp för kryptering och dekryptering.
+- Implementera skapande och upplåsning av valv.
+- Skriva inledande enhetstester.
+
+**Delmål:** Ett valv kan skapas, sparas och öppnas med korrekt huvudlösenord.
+
+### Vecka 2 – Kärnfunktioner och datalagring
+
+- Implementera SQLite-lagring.
+- Skapa modeller och tjänster för lösenordsposter.
+- Implementera CRUD-funktionalitet.
+- Integrera kryptering med datalagringen.
+- Hantera felaktiga lösenord och korrupt data.
+- Skriva tester för kärnfunktionerna.
+
+**Delmål:** Lösenordsposter kan sparas och hämtas krypterat även efter omstart.
+
+### Vecka 3 – Användargränssnitt
+
+- Utveckla gränssnittet med Avalonia UI.
+- Skapa vyer för att skapa och låsa upp valv.
+- Skapa lista och detaljvy för lösenordsposter.
+- Skapa formulär för att lägga till och redigera poster.
+- Integrera UI med kärnlogiken.
+- Implementera prioriterade Should-have-funktioner om tid finns.
+
+**Delmål:** Applikationens grundläggande funktioner kan användas via det grafiska gränssnittet.
+
+### Vecka 4 – Testning, förbättring och dokumentation
+
+- Genomföra funktionella tester.
+- Testa kryptering, integritetskontroller och felhantering.
+- Åtgärda buggar.
+- Förbättra användargränssnittet.
+- Dokumentera installation och användning.
+- Färdigställa projektrapporten.
+- Förbereda demonstration och presentation.
+
+**Delmål:** En fungerande och dokumenterad desktopapplikation kan demonstreras.
+
+## 9. Projektstyrning och arbetsmetod
+
+Projektet genomförs individuellt med ett iterativt arbetssätt.
+
+GitHub Projects används för att planera och följa upp arbetsuppgifter. Varje större funktion eller arbetsmoment representeras av en GitHub Issue.
+
+Arbetsuppgifterna organiseras i följande statusar:
+
+- Backlog
+- Todo
+- In Progress
+- Done
+
+MoSCoW används för att prioritera funktionerna.
+
+Arbetet planeras veckovis, med löpande justeringar beroende på projektets utveckling.
+
+En projektdagbok används för att dokumentera genomfört arbete, problem, lösningar och viktiga beslut.
+
+I slutet av varje vecka görs en kort uppföljning av vad som är färdigt, vad som återstår och om projektets omfattning behöver justeras.
+
+## 10. Testning och kvalitetssäkring
+
+Testningen ska fokusera på att säkerställa att applikationens kärnfunktioner fungerar och att känslig information inte lagras i klartext.
+
+Exempel på tester:
+
+- Kryptering och dekryptering ger korrekt resultat.
+- Fel huvudlösenord kan inte låsa upp valvet.
+- Manipulerad krypterad information avvisas.
+- Två krypteringar av samma innehåll använder inte samma nonce med samma nyckel.
+- Lösenord lagras inte i klartext i databasen.
+- Poster kan skapas, uppdateras och tas bort.
+- Sparade poster finns kvar efter omstart.
+- Applikationen hanterar saknade eller korrupta filer.
+- Valvet låses korrekt och känslig information rensas från gränssnittet.
+
+Tester genomförs löpande under utvecklingen och kompletteras med manuella tester av användargränssnittet.
+
+Projektet ska inte betraktas som en säkerhetsgranskad lösenordshanterare för verkliga kontouppgifter. Testdata används under utvecklingen och kända säkerhetsbegränsningar dokumenteras.
+
+## 11. Förväntat resultat
+
+Det förväntade resultatet är en fungerande desktopapplikation som kan lagra och hantera lösenord i ett lokalt krypterat valv.
+
+Projektet ska även resultera i:
+
+- Källkod i ett GitHub-repository.
+- Dokumenterad arkitektur och teknikval.
+- Automatiserade tester.
+- README med installations- och användarinstruktioner.
+- Projektdagbok och dokumentation av projektets genomförande.
+- Projektrapport med resultat, utmaningar, reflektioner och förbättringsförslag.
+
+## 12. AI-användning
+
+AI-verktyg kan användas som stöd under projektet, exempelvis för att diskutera arkitektur, förklara tekniska koncept, felsöka och ge förslag på kod eller tester.
+
+AI-genererade lösningar ska granskas, förstås och testas innan de används.
+
+AI-användningen dokumenteras i projektrapporten, inklusive exempel på hur verktygen har använts och vilka delar som har behövt verifieras eller ändras.
+
+## 13. Möjliga vidareutvecklingar
+
+Efter projektperioden kan applikationen vidareutvecklas med:
+
+- Mobilapplikation för Android och iOS.
+- Säker synkronisering mellan enheter.
+- Webbläsarintegration.
+- Biometrisk autentisering.
+- Import från andra lösenordshanterare.
+- Mer avancerade säkerhetsanalyser.
+- Stöd för TOTP och passkeys.
+
+Dessa funktioner ingår inte i projektets grundläggande leverans och kommer endast att påbörjas om det finns tid efter att kärnfunktionerna är färdiga.
