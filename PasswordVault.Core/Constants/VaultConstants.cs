@@ -10,4 +10,5 @@ public static class VaultConstants
     public const int Argon2Parallelism = 1;
     public const int NonceSize = 12;
     public const int TagSize = 16;
+    public const int MaxVaultFileSize = 5 * 1024 * 1024; // 5 MB
 }
