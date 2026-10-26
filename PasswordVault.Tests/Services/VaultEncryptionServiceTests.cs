@@ -1,4 +1,5 @@
 ﻿using PasswordVault.Core;
+using PasswordVault.Core.Services;
 using PasswordVault.Security;
 using System.Security.Cryptography;
 using System.Text;

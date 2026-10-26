@@ -1,10 +1,11 @@
 ﻿using PasswordVault.Core.Constants;
+using PasswordVault.Core.Interfaces;
 using PasswordVault.Core.Models;
 using System.Text.Json;
 
 namespace PasswordVault.Storage
 {
-    public class VaultFileSerializer
+    public class VaultFileSerializer : IVaultFileSerializer
     {
         public byte[] Serialize(VaultFile vaultFile)
         {
