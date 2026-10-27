@@ -1,7 +1,7 @@
 ﻿namespace PasswordVault.Core.Constants;
 public static class VaultConstants
 {
-    public const int Version = 1;
+    public const int Version = 2;
     public const string KdfAlgorithm = "Argon2id";
     public const int SaltSize = 16;
     public const int KeySize = 32;

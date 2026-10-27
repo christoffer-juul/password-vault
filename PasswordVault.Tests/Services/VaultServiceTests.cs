@@ -1,10 +1,11 @@
-﻿using PasswordVault.Core.Services;
+﻿using PasswordVault.Core.Serialization;
+using PasswordVault.Core.Services;
 using PasswordVault.Security;
 using PasswordVault.Storage;
-using System;
-using System.Collections.Generic;
+using PasswordVault.Core.Models;
 using System.Security.Cryptography;
 using System.Text;
+using PasswordVault.Core.Constants;
 
 namespace PasswordVault.Tests.Services
 {
@@ -35,9 +36,11 @@ namespace PasswordVault.Tests.Services
 
                 Assert.NotNull(storedData);
 
-                var vaultFile = serializer.Deserialize(storedData!);
+                VaultFile vaultFile = serializer.Deserialize(storedData);
 
-                byte[] decryptedData = await encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt);
+                byte[] aad = VaultMetadataSerializer.Serialize(vaultFile);
+
+                byte[] decryptedData = await encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt, aad);
 
                 string content = Encoding.UTF8.GetString(decryptedData);
 
@@ -213,6 +216,95 @@ namespace PasswordVault.Tests.Services
                 await storage.SaveAsync(corruptedData);
 
                 await Assert.ThrowsAsync<InvalidDataException>(() => vaultService.UnlockVaultAsync(masterPassword));
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task CreateVaultAsync_UsesMetadataAsAad()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                byte[]? storedData = await storage.LoadAsync();
+
+                Assert.NotNull(storedData);
+
+                VaultFile vaultFile = serializer.Deserialize(storedData);
+
+                byte[] aad = VaultMetadataSerializer.Serialize(vaultFile);
+
+                byte[] decryptedData = await encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt, aad);
+
+                string content = Encoding.UTF8.GetString(decryptedData);
+
+                Assert.Equal("""{"entries":[]}""", content);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task UnlockVaultAsync_MissingAad_ThrowsCryptographicException()
+        {
+            string directory = Path.Combine(Path.GetTempPath(),Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var keyDerivation = new KeyDerivationService();
+            var aesEncryption = new AesEncryptionService();
+
+            var encryptionService = new VaultEncryptionService(keyDerivation, aesEncryption);
+
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            byte[] salt = RandomNumberGenerator.GetBytes(VaultConstants.SaltSize);
+
+            try
+            {
+                byte[] plainText = Encoding.UTF8.GetBytes("""{"entries":[]}""");
+
+                byte[] key = await keyDerivation.DeriveKeyAsync(masterPassword, salt);
+
+                byte[] encryptedData;
+
+                try
+                {
+                    encryptedData = aesEncryption.Encrypt(plainText, key);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(key);
+                }
+
+                var vaultFile = new VaultFile{ Salt = salt, EncryptedData = encryptedData };
+
+                await storage.SaveAsync(serializer.Serialize(vaultFile));
+
+                await Assert.ThrowsAnyAsync<CryptographicException>(() => vaultService.UnlockVaultAsync(masterPassword));
             }
             finally
             {

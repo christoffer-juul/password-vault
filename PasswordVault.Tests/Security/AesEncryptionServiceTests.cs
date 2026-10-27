@@ -1,4 +1,5 @@
-﻿using PasswordVault.Security;
+﻿using PasswordVault.Core.Constants;
+using PasswordVault.Security;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -86,6 +87,41 @@ namespace PasswordVault.Tests.Security
 
             // Assert
             Assert.False(encrypted1.SequenceEqual(encrypted2));
+        }
+
+        [Fact]
+        public void Decrypt_WrongAssociatedData_ThrowsCryptographicException()
+        {
+            var encryptionService = new AesEncryptionService();
+
+            byte[] key = RandomNumberGenerator.GetBytes(VaultConstants.KeySize);
+
+            byte[] plainText = Encoding.UTF8.GetBytes("Testdata");
+
+            byte[] correctAad = Encoding.UTF8.GetBytes("Version=1");
+            byte[] wrongAad = Encoding.UTF8.GetBytes("Version=2");
+
+            byte[] encryptedData = encryptionService.Encrypt(plainText, key, correctAad);
+
+            Assert.ThrowsAny<CryptographicException>(() => encryptionService.Decrypt(encryptedData, key, wrongAad));
+        }
+
+        [Fact]
+        public void EncryptThenDecrypt_CorrectAssociatedData_ReturnsOriginalData()
+        {
+            var encryptionService = new AesEncryptionService();
+
+            byte[] key = RandomNumberGenerator.GetBytes(VaultConstants.KeySize);
+
+            byte[] plainText = Encoding.UTF8.GetBytes("Testdata");
+
+            byte[] aad = Encoding.UTF8.GetBytes("Version=1");
+
+            byte[] encryptedData = encryptionService.Encrypt(plainText, key, aad);
+
+            byte[] decryptedData = encryptionService.Decrypt(encryptedData, key, aad);
+
+            Assert.Equal(plainText, decryptedData);
         }
     }
 }

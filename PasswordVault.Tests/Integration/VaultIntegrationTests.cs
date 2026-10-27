@@ -35,11 +35,12 @@ public class VaultIntegrationTests
         byte[] salt = RandomNumberGenerator.GetBytes(
             VaultConstants.SaltSize);
 
+        byte[] aad = Encoding.UTF8.GetBytes("TestAAD");
+
         try
         {
             byte[] encryptedData =
-                await encryptionService.EncryptAsync(
-                    originalData, masterPassword, salt);
+                await encryptionService.EncryptAsync(originalData, masterPassword, salt, aad);
 
             var vaultFile = new VaultFile
             {
@@ -57,7 +58,7 @@ public class VaultIntegrationTests
 
             VaultFile loadedVault = serializer.Deserialize(loadedData);
 
-            byte[] decryptedData = await encryptionService.DecryptAsync(loadedVault.EncryptedData, masterPassword, loadedVault.Salt);
+            byte[] decryptedData = await encryptionService.DecryptAsync(loadedVault.EncryptedData, masterPassword, loadedVault.Salt, aad);
 
             Assert.Equal(originalData, decryptedData);
         }
