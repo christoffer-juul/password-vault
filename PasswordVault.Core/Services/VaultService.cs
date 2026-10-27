@@ -1,8 +1,7 @@
 ﻿using PasswordVault.Core.Constants;
 using PasswordVault.Core.Interfaces;
 using PasswordVault.Core.Models;
-using System;
-using System.Collections.Generic;
+using PasswordVault.Core.Serialization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -30,13 +29,22 @@ namespace PasswordVault.Core.Services
 
             byte[] salt = RandomNumberGenerator.GetBytes(VaultConstants.SaltSize);
 
+            var metadata = new VaultFile { Salt = salt };
+
+            byte[] aad = VaultMetadataSerializer.Serialize(metadata);
+
             byte[] plainText = Encoding.UTF8.GetBytes("""{"entries":[]}""");
 
-            byte[] encryptedData = await _encryptionService.EncryptAsync(plainText, masterPassword, salt);
+            byte[] encryptedData = await _encryptionService.EncryptAsync(plainText, masterPassword, salt, aad);
 
             var vaultFile = new VaultFile
             {
-                Salt = salt,
+                Version = metadata.Version,
+                KdfAlgorithm = metadata.KdfAlgorithm,
+                MemoryKiB = metadata.MemoryKiB,
+                Iterations = metadata.Iterations,
+                Parallelism = metadata.Parallelism,
+                Salt = metadata.Salt,
                 EncryptedData = encryptedData
             };
 
@@ -56,7 +64,9 @@ namespace PasswordVault.Core.Services
 
             VaultFile vaultFile = _serializer.Deserialize(storedData);
 
-            byte[] decryptedData = await _encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt);
+            byte[] aad = VaultMetadataSerializer.Serialize(vaultFile);
+
+            byte[] decryptedData = await _encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt, aad);
 
             return decryptedData;
         }

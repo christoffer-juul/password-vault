@@ -9,7 +9,7 @@ namespace PasswordVault.Security
         private const int NonceSize = 12; // 96 bits for GCM
         private const int TagSize = 16; // 128 bits for GCM
 
-        public byte[] Encrypt(byte[] plainText, byte[] key)
+        public byte[] Encrypt(byte[] plainText, byte[] key, byte[]? associatedData = null)
         {
             ValidateKey(key);
             ArgumentNullException.ThrowIfNull(plainText);
@@ -25,13 +25,13 @@ namespace PasswordVault.Security
             using var aes = new AesGcm(key, TagSize);
 
             // Encrypt the plaintext
-            aes.Encrypt(nonce, plainText, ciphertext, tag);
+            aes.Encrypt(nonce, plainText, ciphertext, tag, associatedData);
 
             // Combine nonce, tag, and ciphertext into a single byte array for storage or transmission
             return [.. nonce, ..  tag, .. ciphertext];
         }
 
-        public byte[] Decrypt(byte[] encryptedData, byte[] key)
+        public byte[] Decrypt(byte[] encryptedData, byte[] key, byte[]? associatedData = null)
         {
             ValidateKey(key);
             ArgumentNullException.ThrowIfNull(encryptedData);
@@ -52,7 +52,7 @@ namespace PasswordVault.Security
             try
             {
                 // Decrypt and verify the authenticity of the ciphertext
-                aes.Decrypt(nonce, ciphertext, tag, plainText);
+                aes.Decrypt(nonce, ciphertext, tag, plainText, associatedData);
 
                 return plainText;
             }
