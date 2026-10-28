@@ -24,9 +24,6 @@ namespace PasswordVault.Core.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(masterPassword);
 
-            if (await _storage.LoadAsync() is not null)
-                throw new InvalidOperationException("Vault already exists.");
-
             byte[] salt = RandomNumberGenerator.GetBytes(VaultConstants.SaltSize);
 
             var metadata = new VaultFile { Salt = salt };
@@ -50,7 +47,7 @@ namespace PasswordVault.Core.Services
 
             byte[] serializedData = _serializer.Serialize(vaultFile);
 
-            await _storage.SaveAsync(serializedData);
+            await _storage.SaveNewAsync(serializedData);
         }
 
         public async Task<byte[]> UnlockVaultAsync(string masterPassword)
