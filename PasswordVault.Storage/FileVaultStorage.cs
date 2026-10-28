@@ -14,7 +14,17 @@ namespace PasswordVault.Storage
             _filePath = Path.GetFullPath(filePath);
         }
 
-        public async Task SaveAsync(byte[] encryptedVault)
+        public Task SaveAsync(byte[] encryptedVault)
+        {
+            return SaveInternalAsync(encryptedVault, overwrite: true);
+        }
+
+        public Task SaveNewAsync(byte[] encryptedVault)
+        {
+            return SaveInternalAsync(encryptedVault, overwrite: false);
+        }
+
+        private async Task SaveInternalAsync(byte[] encryptedVault, bool overwrite)
         {
             ArgumentNullException.ThrowIfNull(encryptedVault);
 
@@ -31,14 +41,19 @@ namespace PasswordVault.Storage
             {
                 await File.WriteAllBytesAsync(tempPath, encryptedVault);
 
-                File.Move(tempPath, _filePath, overwrite: true);
+                try
+                {
+                    File.Move(tempPath, _filePath, overwrite);
+                }
+                catch (IOException ex) when (!overwrite && File.Exists(_filePath))
+                {
+                    throw new InvalidOperationException("A vault already exists.", ex);
+                }
             }
             finally
             {
                 if (File.Exists(tempPath))
-                {
                     File.Delete(tempPath);
-                }
             }
         }
 
@@ -47,12 +62,39 @@ namespace PasswordVault.Storage
             if (!File.Exists(_filePath))
                 return null;
 
-            FileInfo fileInfo = new FileInfo(_filePath);
+            await using var stream = new FileStream(
+                _filePath, 
+                FileMode.Open, 
+                FileAccess.Read, 
+                FileShare.Read, 
+                bufferSize: 8192, 
+                useAsync: true);
 
-            if (fileInfo.Length > VaultConstants.MaxVaultFileSize)
+            if (stream.Length > VaultConstants.MaxVaultFileSize)
                 throw new InvalidDataException("Vault file exceeds maximum size.");
 
-            return await File.ReadAllBytesAsync(_filePath);
+            using var memoryStream = new MemoryStream();
+
+            byte[] buffer = new byte[8192];
+
+            while (true)
+            {
+                int remaining = VaultConstants.MaxVaultFileSize - (int)memoryStream.Length;
+
+                int bytesToRead = Math.Min(buffer.Length, remaining + 1);
+
+                int bytesRead = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead));
+
+                if (bytesRead == 0)
+                    break;
+
+                if (bytesRead > remaining)
+                    throw new InvalidDataException("Vault file exceeds maximum size.");
+
+                memoryStream.Write(buffer, 0, bytesRead);
+            }
+
+            return memoryStream.ToArray();
         }
     }
 }
