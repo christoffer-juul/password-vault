@@ -137,11 +137,9 @@ namespace PasswordVault.Tests.Services
             {
                 await vaultService.CreateVaultAsync(masterPassword);
 
-                byte[] decryptedData = await vaultService.UnlockVaultAsync(masterPassword);
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
 
-                string content = Encoding.UTF8.GetString(decryptedData);
-
-                Assert.Equal("""{"entries":[]}""", content);
+                Assert.Empty(vault.Entries);
             }
             finally
             {
@@ -164,7 +162,7 @@ namespace PasswordVault.Tests.Services
 
             string correctPassword = "testar123!";
             string wrongPassword = "fel123!";
-            
+
             try
             {
                 await vaultService.CreateVaultAsync(correctPassword);
@@ -266,7 +264,7 @@ namespace PasswordVault.Tests.Services
         [Fact]
         public async Task UnlockVaultAsync_MissingAad_ThrowsCryptographicException()
         {
-            string directory = Path.Combine(Path.GetTempPath(),Guid.NewGuid().ToString());
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             string filePath = Path.Combine(directory, "vault.dat");
 
             var storage = new FileVaultStorage(filePath);
@@ -300,11 +298,295 @@ namespace PasswordVault.Tests.Services
                     CryptographicOperations.ZeroMemory(key);
                 }
 
-                var vaultFile = new VaultFile{ Salt = salt, EncryptedData = encryptedData };
+                var vaultFile = new VaultFile { Salt = salt, EncryptedData = encryptedData };
 
                 await storage.SaveAsync(serializer.Serialize(vaultFile));
 
                 await Assert.ThrowsAnyAsync<CryptographicException>(() => vaultService.UnlockVaultAsync(masterPassword));
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task UnlockVaultAsync_CorrectPassword_ReturnsEmptyVault()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.NotNull(vault);
+                Assert.Empty(vault.Entries);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveVaultAsync_ValidVault_SavesPasswordEntries()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                var entry = new PasswordEntry
+                {
+                    Title = "Test Entry",
+                    Username = "test@example.com",
+                    Password = "testar123",
+                    Url = "https://example.com"
+                };
+
+                vault.AddEntry(entry);
+
+                await vaultService.SaveVaultAsync(vault, masterPassword);
+
+                Vault loadedVault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.Single(loadedVault.Entries);
+
+                PasswordEntry loadedEntry = loadedVault.Entries[0];
+
+                Assert.Equal(entry.Id, loadedEntry.Id);
+                Assert.Equal(entry.Title, loadedEntry.Title);
+                Assert.Equal(entry.Username, loadedEntry.Username);
+                Assert.Equal(entry.Password, loadedEntry.Password);
+                Assert.Equal(entry.Url, loadedEntry.Url);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveVaultAsync_WrongPassword_DoesNotOverwriteVault()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+            string wrongPassword = "fel123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                var entry = new PasswordEntry
+                {
+                    Title = "Test Entry",
+                    Username = "test@example.com",
+                    Password = "testar123",
+                    Url = "https://example.com"
+                };
+
+                vault.AddEntry(entry);
+
+                await vaultService.SaveVaultAsync(vault, masterPassword);
+
+                byte[]? originalFileData = await storage.LoadAsync();
+                Assert.NotNull(originalFileData);
+
+                await Assert.ThrowsAnyAsync<CryptographicException>(
+                    () => vaultService.SaveVaultAsync(vault, wrongPassword));
+
+                byte[]? fileDataAfterFailedSave = await storage.LoadAsync();
+                Assert.NotNull(fileDataAfterFailedSave);
+
+                Assert.Equal(originalFileData, fileDataAfterFailedSave);
+
+                Vault loadedVault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.Single(loadedVault.Entries);
+
+                PasswordEntry loadedEntry = loadedVault.Entries[0];
+
+                Assert.Equal(entry.Id, loadedEntry.Id);
+                Assert.Equal(entry.Title, loadedEntry.Title);
+                Assert.Equal(entry.Username, loadedEntry.Username);
+                Assert.Equal(entry.Password, loadedEntry.Password);
+                Assert.Equal(entry.Url, loadedEntry.Url);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveVaultAsync_VaultDoesNotExist_ThrowsFileNotFoundException()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            var vault = new Vault();
+
+            await Assert.ThrowsAsync<FileNotFoundException>(() => vaultService.SaveVaultAsync(vault, masterPassword));
+            Assert.False(File.Exists(filePath));
+        }
+
+        [Fact]
+        public async Task SaveVaultAsync_UpdatedEntry_PersistsChanges()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                var entry = new PasswordEntry
+                {
+                    Title = "Test",
+                    Username = "old@example.com",
+                    Password = "oldpassword123"
+                };
+
+                vault.AddEntry(entry);
+
+                await vaultService.SaveVaultAsync(vault, masterPassword);
+
+                var updatedEntry = new PasswordEntry
+                {
+                    Id = entry.Id,
+                    Title = "Test",
+                    Username = "new@example.com",
+                    Password = "newpassword456"
+                };
+
+                vault.UpdateEntry(updatedEntry);
+
+                await vaultService.SaveVaultAsync(vault, masterPassword);
+
+                Vault loadedVault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.Single(loadedVault.Entries);
+
+                PasswordEntry loadedEntry = loadedVault.Entries[0];
+
+                Assert.Equal(entry.Id, loadedEntry.Id);
+                Assert.Equal("new@example.com", loadedEntry.Username);
+                Assert.Equal("newpassword456", loadedEntry.Password);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveVaultAsync_RemovedEntry_PersistsChanges()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                var githubEntry = new PasswordEntry
+                {
+                    Title = "GitHub",
+                    Username = "github@example.com",
+                    Password = "password123"
+                };
+
+                var discordEntry = new PasswordEntry
+                {
+                    Title = "Discord",
+                    Username = "discord@example.com",
+                    Password = "password456"
+                };
+
+                vault.AddEntry(githubEntry);
+                vault.AddEntry(discordEntry);
+
+                await vaultService.SaveVaultAsync(vault, masterPassword);
+
+                vault.RemoveEntry(githubEntry.Id);
+
+                await vaultService.SaveVaultAsync(vault, masterPassword);
+
+                Vault loadedVault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.Single(loadedVault.Entries);
+
+                PasswordEntry remainingEntry = loadedVault.Entries[0];
+
+                Assert.Equal(discordEntry.Id, remainingEntry.Id);
+                Assert.Equal(discordEntry.Title, remainingEntry.Title);
+                Assert.Equal(discordEntry.Password, remainingEntry.Password);
             }
             finally
             {

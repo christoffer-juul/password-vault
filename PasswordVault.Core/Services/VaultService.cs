@@ -30,27 +30,35 @@ namespace PasswordVault.Core.Services
 
             byte[] aad = VaultMetadataSerializer.Serialize(metadata);
 
-            byte[] plainText = Encoding.UTF8.GetBytes("""{"entries":[]}""");
+            var vault = new Vault();
+            byte[] plainText = VaultContentSerializer.Serialize(vault);
 
-            byte[] encryptedData = await _encryptionService.EncryptAsync(plainText, masterPassword, salt, aad);
-
-            var vaultFile = new VaultFile
+            try
             {
-                Version = metadata.Version,
-                KdfAlgorithm = metadata.KdfAlgorithm,
-                MemoryKiB = metadata.MemoryKiB,
-                Iterations = metadata.Iterations,
-                Parallelism = metadata.Parallelism,
-                Salt = metadata.Salt,
-                EncryptedData = encryptedData
-            };
+                byte[] encryptedData = await _encryptionService.EncryptAsync(plainText, masterPassword, salt, aad);
 
-            byte[] serializedData = _serializer.Serialize(vaultFile);
+                var vaultFile = new VaultFile
+                {
+                    Version = metadata.Version,
+                    KdfAlgorithm = metadata.KdfAlgorithm,
+                    MemoryKiB = metadata.MemoryKiB,
+                    Iterations = metadata.Iterations,
+                    Parallelism = metadata.Parallelism,
+                    Salt = metadata.Salt,
+                    EncryptedData = encryptedData
+                };
 
-            await _storage.SaveNewAsync(serializedData);
+                byte[] serializedData = _serializer.Serialize(vaultFile);
+
+                await _storage.SaveNewAsync(serializedData);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(plainText);
+            }
         }
 
-        public async Task<byte[]> UnlockVaultAsync(string masterPassword)
+        public async Task<Vault> UnlockVaultAsync(string masterPassword)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(masterPassword);
 
@@ -65,7 +73,66 @@ namespace PasswordVault.Core.Services
 
             byte[] decryptedData = await _encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt, aad);
 
-            return decryptedData;
+            try
+            {
+                return VaultContentSerializer.Deserialize(decryptedData);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(decryptedData);
+            }
+        }
+
+        public async Task SaveVaultAsync(Vault vault, string masterPassword)
+        {
+            ArgumentNullException.ThrowIfNull(vault);
+            ArgumentException.ThrowIfNullOrWhiteSpace(masterPassword);
+
+            byte[]? storedData = await _storage.LoadAsync();
+
+            if (storedData is null)
+                throw new FileNotFoundException("Vault file not found.");
+
+            VaultFile vaultFile = _serializer.Deserialize(storedData);
+
+            byte[] aad = VaultMetadataSerializer.Serialize(vaultFile);
+
+            byte[] existingPlainText = await _encryptionService.DecryptAsync(vaultFile.EncryptedData, masterPassword, vaultFile.Salt, aad);
+
+            try
+            {
+                VaultContentSerializer.Deserialize(existingPlainText);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(existingPlainText);
+            }
+
+            byte[] plainText = VaultContentSerializer.Serialize(vault);
+
+            try
+            {
+                byte[] encryptedData = await _encryptionService.EncryptAsync(plainText, masterPassword, vaultFile.Salt, aad);
+
+                var updatedVaultFile = new VaultFile
+                {
+                    Version = vaultFile.Version,
+                    KdfAlgorithm = vaultFile.KdfAlgorithm,
+                    MemoryKiB = vaultFile.MemoryKiB,
+                    Iterations = vaultFile.Iterations,
+                    Parallelism = vaultFile.Parallelism,
+                    Salt = vaultFile.Salt,
+                    EncryptedData = encryptedData
+                };
+
+                byte[] serializedData = _serializer.Serialize(updatedVaultFile);
+
+                await _storage.SaveAsync(serializedData);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(plainText);
+            }
         }
     }
 }
