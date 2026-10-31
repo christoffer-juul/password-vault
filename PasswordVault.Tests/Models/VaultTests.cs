@@ -181,5 +181,59 @@ namespace PasswordVault.Tests.Models
             Assert.Single(vault.Entries);
             Assert.Equal(discordEntry.Id, vault.Entries[0].Id);
         }
+
+        [Fact]
+        public void AddEntry_NullUsername_ThrowsArgumentException()
+        {
+            var vault = new Vault();
+
+            var entry = new PasswordEntry
+            {
+                Title = "Test",
+                Username = null!,
+                Password = "testar123!"
+            };
+
+            Assert.Throws<ArgumentException>(() => vault.AddEntry(entry));
+
+            Assert.Empty(vault.Entries);
+        }
+
+        [Fact]
+        public void AddEntry_NullUrl_ThrowsArgumentException()
+        {
+            var vault = new Vault();
+
+            var entry = new PasswordEntry
+            {
+                Title = "Test",
+                Username = "test@example.com",
+                Password = "testar123!",
+                Url = null!
+            };
+
+            Assert.Throws<ArgumentException>(() => vault.AddEntry(entry));
+
+            Assert.Empty(vault.Entries);
+        }
+
+        [Fact]
+        public void AddEntry_EmptyOptionalFields_AddsEntry()
+        {
+            var vault = new Vault();
+
+            var entry = new PasswordEntry
+            {
+                Title = "Test",
+                Username = "",
+                Password = "testar123!",
+                Url = ""
+            };
+
+            vault.AddEntry(entry);
+
+            Assert.Single(vault.Entries);
+            Assert.Equal(entry.Id, vault.Entries[0].Id);
+        }
     }
 }

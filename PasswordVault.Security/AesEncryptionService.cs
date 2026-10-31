@@ -1,13 +1,14 @@
-﻿using PasswordVault.Core.Interfaces;
+﻿using PasswordVault.Core.Constants;
+using PasswordVault.Core.Interfaces;
 using System.Security.Cryptography;
 
 namespace PasswordVault.Security
 {
     public class AesEncryptionService : IEncryptionService
     {
-        private const int KeySize = 32; // 256 bits
-        private const int NonceSize = 12; // 96 bits for GCM
-        private const int TagSize = 16; // 128 bits for GCM
+        private const int KeySize = VaultConstants.KeySize; // 256 bits
+        private const int NonceSize = VaultConstants.NonceSize; // 96 bits for GCM
+        private const int TagSize = VaultConstants.TagSize; // 128 bits for GCM
 
         public byte[] Encrypt(byte[] plainText, byte[] key, byte[]? associatedData = null)
         {
@@ -47,16 +48,16 @@ namespace PasswordVault.Security
             byte[] ciphertext = encryptedData[(NonceSize + TagSize)..];
             byte[] plainText = new byte[ciphertext.Length];
 
-            using var aes = new AesGcm(key, TagSize);
-
             try
             {
+                using var aes = new AesGcm(key, TagSize);
+
                 // Decrypt and verify the authenticity of the ciphertext
                 aes.Decrypt(nonce, ciphertext, tag, plainText, associatedData);
 
                 return plainText;
             }
-            catch (CryptographicException)
+            catch
             {
                 // Clear the plaintext buffer to prevent sensitive data from lingering in memory
                 CryptographicOperations.ZeroMemory(plainText);

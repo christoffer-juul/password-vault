@@ -50,7 +50,7 @@ public class VaultIntegrationTests
 
             byte[] serializedData = serializer.Serialize(vaultFile);
 
-            await storage.SaveAsync(serializedData);
+            await storage.SaveNewAsync(serializedData);
 
             byte[]? loadedData = await storage.LoadAsync();
 

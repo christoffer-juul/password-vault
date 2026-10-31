@@ -132,5 +132,27 @@ namespace PasswordVault.Tests.Serialization
                 """);
             Assert.Throws<InvalidDataException>(() => VaultContentSerializer.Deserialize(data));
         }
+
+        [Fact]
+        public void Deserialize_NullUsername_ThrowsInvalidDataException()
+        {
+            string json = $$"""
+                {
+                    "entries": [
+                        {
+                        "id": "{{Guid.NewGuid()}}",
+                        "title": "Test",
+                        "username": null,
+                        "password": "testar123!",
+                        "url": ""
+                        }
+                    ]
+                }
+                """;
+
+            byte[] data = Encoding.UTF8.GetBytes(json);
+
+            Assert.Throws<InvalidDataException>(() => VaultContentSerializer.Deserialize(data));
+        }
     }
 }

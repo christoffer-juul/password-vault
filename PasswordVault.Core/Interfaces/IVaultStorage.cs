@@ -2,8 +2,8 @@
 {
     public interface IVaultStorage
     {
-        Task SaveAsync(byte[] encryptedVault);
         Task SaveNewAsync(byte[] encryptedVault);
+        Task SaveAsync(byte[] encryptedVault, string expectedVersion);
         Task<byte[]?> LoadAsync();
     }
 }

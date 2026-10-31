@@ -6,6 +6,7 @@ using PasswordVault.Core.Models;
 using System.Security.Cryptography;
 using System.Text;
 using PasswordVault.Core.Constants;
+using PasswordVault.Core.Exceptions;
 
 namespace PasswordVault.Tests.Services
 {
@@ -211,7 +212,7 @@ namespace PasswordVault.Tests.Services
 
             try
             {
-                await storage.SaveAsync(corruptedData);
+                await storage.SaveNewAsync(corruptedData);
 
                 await Assert.ThrowsAsync<InvalidDataException>(() => vaultService.UnlockVaultAsync(masterPassword));
             }
@@ -300,7 +301,7 @@ namespace PasswordVault.Tests.Services
 
                 var vaultFile = new VaultFile { Salt = salt, EncryptedData = encryptedData };
 
-                await storage.SaveAsync(serializer.Serialize(vaultFile));
+                await storage.SaveNewAsync(serializer.Serialize(vaultFile));
 
                 await Assert.ThrowsAnyAsync<CryptographicException>(() => vaultService.UnlockVaultAsync(masterPassword));
             }
@@ -587,6 +588,135 @@ namespace PasswordVault.Tests.Services
                 Assert.Equal(discordEntry.Id, remainingEntry.Id);
                 Assert.Equal(discordEntry.Title, remainingEntry.Title);
                 Assert.Equal(discordEntry.Password, remainingEntry.Password);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveVaultAsync_StaleVault_DoesNotOverwriteNewerChanges()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vaultA = await vaultService.UnlockVaultAsync(masterPassword);
+                Vault vaultB = await vaultService.UnlockVaultAsync(masterPassword);
+
+                var githubEntry = new PasswordEntry
+                {
+                    Title = "GitHub",
+                    Username = "github@example.com",
+                    Password = "password123"
+                };
+
+                vaultA.AddEntry(githubEntry);
+
+                await vaultService.SaveVaultAsync(vaultA, masterPassword);
+
+                byte[]? originalFileData = await storage.LoadAsync();
+
+                Assert.NotNull(originalFileData);
+
+                var discordEntry = new PasswordEntry
+                {
+                    Title = "Discord",
+                    Username = "discord@example.com",
+                    Password = "password456"
+                };
+
+                vaultB.AddEntry(discordEntry);
+
+                await Assert.ThrowsAsync<VaultConflictException>(() => vaultService.SaveVaultAsync(vaultB, masterPassword));
+
+                byte[]? fileDataAfter = await storage.LoadAsync();
+
+                Assert.NotNull(fileDataAfter);
+                Assert.Equal(originalFileData, fileDataAfter);
+
+                Vault loadedVault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.Single(loadedVault.Entries);
+                Assert.Equal(githubEntry.Id, loadedVault.Entries[0].Id);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task UnlockVaultAsync_ExistingVault_SetsSourceVersion()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                byte[]? fileData = await storage.LoadAsync();
+                Assert.NotNull(fileData);
+
+                string expectedVersion = Convert.ToHexString(SHA256.HashData(fileData));
+
+                Vault vault = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.Equal(expectedVersion, vault.SourceVersion);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task UnlockVaultAsync_SameFile_ReturnsSameSourceVersion()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+            var serializer = new VaultFileSerializer();
+
+            var encryptionService = new VaultEncryptionService(new KeyDerivationService(), new AesEncryptionService());
+            var vaultService = new VaultService(storage, serializer, encryptionService);
+
+            string masterPassword = "testar123!";
+
+            try
+            {
+                await vaultService.CreateVaultAsync(masterPassword);
+
+                Vault vaultA = await vaultService.UnlockVaultAsync(masterPassword);
+                Vault vaultB = await vaultService.UnlockVaultAsync(masterPassword);
+
+                Assert.NotNull(vaultA.SourceVersion);
+                Assert.Equal(vaultA.SourceVersion, vaultB.SourceVersion);
             }
             finally
             {

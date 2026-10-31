@@ -8,14 +8,14 @@ namespace PasswordVault.Security
 {
     public class KeyDerivationService : IKeyDerivationService
     {
-        private const int KeySize = 32; // 256 bits
-        private const int SaltSize = 16; // 128 bits
+        private const int KeySize = VaultConstants.KeySize; // 256 bits
+        private const int SaltSize = VaultConstants.SaltSize; // 128 bits
 
         public async Task<byte[]> DeriveKeyAsync(string password, byte[] salt)
         {
-            if (string.IsNullOrEmpty(password))
+            if (string.IsNullOrWhiteSpace(password))
             {
-                throw new ArgumentException("Password cannot be empty.", nameof(password));
+                throw new ArgumentException("Password cannot be empty or whitespace.", nameof(password));
             }
 
             ArgumentNullException.ThrowIfNull(salt);
