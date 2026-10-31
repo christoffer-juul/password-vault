@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Security.Cryptography;
+using System.Text.Json.Serialization;
 
 namespace PasswordVault.Core.Models
 {
@@ -7,6 +8,9 @@ namespace PasswordVault.Core.Models
         private readonly List<PasswordEntry> _entries = [];
 
         public IReadOnlyList<PasswordEntry> Entries => _entries.AsReadOnly();
+
+        [JsonIgnore]
+        public string? SourceVersion { get; private set; }
 
         private static void ValidateEntry(PasswordEntry entry)
         {
@@ -18,8 +22,14 @@ namespace PasswordVault.Core.Models
             if (string.IsNullOrWhiteSpace(entry.Title))
                 throw new ArgumentException("Entry title cannot be empty.");
 
+            if (entry.Username is null)
+                throw new ArgumentException("Username cannot be null.");
+
             if (entry.Password is null)
                 throw new ArgumentException("Password cannot be null.");
+
+            if (entry.Url is null)
+                throw new ArgumentException("URL cannot be null.");
         }
         
         public void AddEntry(PasswordEntry entry)
@@ -52,6 +62,13 @@ namespace PasswordVault.Core.Models
                 throw new KeyNotFoundException("Entry not found.");
 
             _entries.RemoveAt(index);
+        }
+
+        internal void SetSourceVersion(byte[] fileData)
+        {
+            ArgumentNullException.ThrowIfNull(fileData);
+
+            SourceVersion = Convert.ToHexString(SHA256.HashData(fileData));
         }
     }
 }

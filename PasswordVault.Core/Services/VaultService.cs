@@ -75,7 +75,11 @@ namespace PasswordVault.Core.Services
 
             try
             {
-                return VaultContentSerializer.Deserialize(decryptedData);
+                Vault vault = VaultContentSerializer.Deserialize(decryptedData);
+
+                vault.SetSourceVersion(storedData);
+
+                return vault;
             }
             finally
             {
@@ -92,6 +96,9 @@ namespace PasswordVault.Core.Services
 
             if (storedData is null)
                 throw new FileNotFoundException("Vault file not found.");
+
+            string expectedVersion = vault.SourceVersion
+                ?? throw new InvalidOperationException("Vault has no source version. Unlock it before saving.");
 
             VaultFile vaultFile = _serializer.Deserialize(storedData);
 
@@ -127,7 +134,8 @@ namespace PasswordVault.Core.Services
 
                 byte[] serializedData = _serializer.Serialize(updatedVaultFile);
 
-                await _storage.SaveAsync(serializedData);
+                await _storage.SaveAsync(serializedData, expectedVersion);
+                vault.SetSourceVersion(serializedData);
             }
             finally
             {

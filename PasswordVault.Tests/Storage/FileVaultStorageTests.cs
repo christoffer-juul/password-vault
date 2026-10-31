@@ -1,5 +1,7 @@
 ﻿using PasswordVault.Core.Constants;
+using PasswordVault.Core.Exceptions;
 using PasswordVault.Storage;
+using System.Security.Cryptography;
 
 namespace PasswordVault.Tests.Storage
 {
@@ -18,7 +20,7 @@ namespace PasswordVault.Tests.Storage
 
             try
             {
-                await storage.SaveAsync(data);
+                await storage.SaveNewAsync(data);
 
                 Assert.True(File.Exists(filePath));
             }
@@ -44,7 +46,7 @@ namespace PasswordVault.Tests.Storage
 
             try
             {
-                await storage.SaveAsync(data);
+                await storage.SaveNewAsync(data);
 
                 byte[]? loadedData = await storage.LoadAsync();
 
@@ -87,7 +89,7 @@ namespace PasswordVault.Tests.Storage
 
             try
             {
-                await Assert.ThrowsAsync<InvalidDataException>(() => storage.SaveAsync(data));
+                await Assert.ThrowsAsync<InvalidDataException>(() => storage.SaveNewAsync(data));
             }
             finally
             {
@@ -137,9 +139,11 @@ namespace PasswordVault.Tests.Storage
 
             try
             {
-                await storage.SaveAsync(initialData);
+                await storage.SaveNewAsync(initialData);
 
-                await Assert.ThrowsAsync<InvalidDataException>(() => storage.SaveAsync(newData));
+                string expectedVersion = Convert.ToHexString(SHA256.HashData(initialData));
+
+                await Assert.ThrowsAsync<InvalidDataException>(() => storage.SaveAsync(newData, expectedVersion));
 
                 Assert.True(File.Exists(filePath));
 
@@ -170,8 +174,12 @@ namespace PasswordVault.Tests.Storage
 
             try
             {
-                await storage.SaveAsync(initialData);
-                await storage.SaveAsync(newData);
+                await storage.SaveNewAsync(initialData);
+
+                string expectedVersion = Convert.ToHexString(SHA256.HashData(initialData));
+
+
+                await storage.SaveAsync(newData, expectedVersion);
 
                 byte[]? loadedData = await storage.LoadAsync();
 
@@ -231,7 +239,7 @@ namespace PasswordVault.Tests.Storage
 
             try
             {
-                Exception? exception = await Record.ExceptionAsync(() => storage.SaveAsync(data));
+                Exception? exception = await Record.ExceptionAsync(() => storage.SaveNewAsync(data));
 
                 Assert.NotNull(exception);
 
@@ -338,6 +346,116 @@ namespace PasswordVault.Tests.Storage
                 bool matchesSecond = loadedData.SequenceEqual(secondData);
 
                 Assert.True(matchesFirst || matchesSecond);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveAsync_StaleVersion_DoesNotOverwriteFile()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+
+            byte[] originalData = [1, 2, 3];
+            byte[] updatedData = [4, 5, 6];
+            byte[] staleData = [7, 8, 9];
+
+            try
+            {
+                await storage.SaveNewAsync(originalData);
+
+                string originalVersion = Convert.ToHexString(SHA256.HashData(originalData));
+
+                await storage.SaveAsync(updatedData, originalVersion);
+
+                await Assert.ThrowsAsync<VaultConflictException>(() => storage.SaveAsync(staleData, originalVersion));
+
+                byte[]? loadedData = await storage.LoadAsync();
+
+                Assert.NotNull(loadedData);
+                Assert.Equal(updatedData, loadedData);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveAsync_MatchingVersion_UpdatesFile()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storage = new FileVaultStorage(filePath);
+
+            byte[] originalData = [1, 2, 3];
+            byte[] updatedData = [4, 5, 6];
+
+            try
+            {
+                await storage.SaveNewAsync(originalData);
+
+                string expectedVersion = Convert.ToHexString(SHA256.HashData(originalData));
+
+                await storage.SaveAsync(updatedData, expectedVersion);
+
+                byte[]? loadedData = await storage.LoadAsync();
+
+                Assert.NotNull(loadedData);
+                Assert.Equal(updatedData, loadedData);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task SaveAsync_ConcurrentUpdates_OnlyOneSucceeds()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+            string filePath = Path.Combine(directory, "vault.dat");
+
+            var storageA = new FileVaultStorage(filePath);
+            var storageB = new FileVaultStorage(filePath);
+
+            byte[] originalData = [1, 2, 3];
+            byte[] dataA = [4, 5, 6];
+            byte[] dataB = [7, 8, 9];
+
+            try
+            {
+                await storageA.SaveNewAsync(originalData);
+
+                string expectedVersion = Convert.ToHexString(SHA256.HashData(originalData));
+
+                Task<Exception?> taskA = Record.ExceptionAsync(() => storageA.SaveAsync(dataA, expectedVersion));
+
+                Task<Exception?> taskB = Record.ExceptionAsync(() => storageB.SaveAsync(dataB, expectedVersion));
+
+                Exception?[] results = await Task.WhenAll(taskA, taskB);
+
+                Assert.Equal(1, results.Count(e => e is null));
+
+                Assert.Equal(1, results.Count(e => e is VaultConflictException));
+
+                byte[]? loadedData = await storageA.LoadAsync();
+
+                Assert.NotNull(loadedData);
+
+                Assert.True(loadedData.SequenceEqual(dataA) || loadedData.SequenceEqual(dataB));
             }
             finally
             {

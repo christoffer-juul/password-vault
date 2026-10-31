@@ -1,5 +1,7 @@
 ﻿using PasswordVault.Core.Constants;
+using PasswordVault.Core.Exceptions;
 using PasswordVault.Core.Interfaces;
+using System.Security.Cryptography;
 
 namespace PasswordVault.Storage
 {
@@ -14,14 +16,18 @@ namespace PasswordVault.Storage
             _filePath = Path.GetFullPath(filePath);
         }
 
-        public Task SaveAsync(byte[] encryptedVault)
+        public async Task SaveNewAsync(byte[] encryptedVault)
         {
-            return SaveInternalAsync(encryptedVault, overwrite: true);
-        }
+            ArgumentNullException.ThrowIfNull(encryptedVault);
 
-        public Task SaveNewAsync(byte[] encryptedVault)
-        {
-            return SaveInternalAsync(encryptedVault, overwrite: false);
+            string directory = Path.GetDirectoryName(_filePath)!;
+            Directory.CreateDirectory(directory);
+
+            string lockPath = _filePath + ".lock";
+
+            await using FileStream lockStream = await AcquireLockAsync(lockPath);
+
+            await SaveInternalAsync(encryptedVault, overwrite: false);
         }
 
         private async Task SaveInternalAsync(byte[] encryptedVault, bool overwrite)
@@ -33,13 +39,22 @@ namespace PasswordVault.Storage
 
             string directory = Path.GetDirectoryName(_filePath)!;
 
-            Directory.CreateDirectory(directory);
-
             string tempPath = Path.Combine(directory, $".{Path.GetFileName(_filePath)}.{Guid.NewGuid():N}.tmp");
 
             try
             {
-                await File.WriteAllBytesAsync(tempPath, encryptedVault);
+                await using (var stream = new FileStream(
+                    tempPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 8192,
+                    useAsync: true))
+                {
+                    await stream.WriteAsync(encryptedVault.AsMemory());
+
+                    stream.Flush(flushToDisk: true);
+                }
 
                 try
                 {
@@ -47,7 +62,8 @@ namespace PasswordVault.Storage
                 }
                 catch (IOException ex) when (!overwrite && File.Exists(_filePath))
                 {
-                    throw new InvalidOperationException("A vault already exists.", ex);
+                    throw new InvalidOperationException(
+                        "A vault already exists.", ex);
                 }
             }
             finally
@@ -55,6 +71,34 @@ namespace PasswordVault.Storage
                 if (File.Exists(tempPath))
                     File.Delete(tempPath);
             }
+        }
+
+        public async Task SaveAsync(byte[] encryptedVault, string expectedVersion)
+        {
+            ArgumentNullException.ThrowIfNull(encryptedVault);
+            ArgumentException.ThrowIfNullOrWhiteSpace(expectedVersion);
+
+            if (encryptedVault.Length > VaultConstants.MaxVaultFileSize)
+                throw new InvalidDataException("Vault file exceeds maximum size.");
+
+            string directory = Path.GetDirectoryName(_filePath)!;
+            Directory.CreateDirectory(directory);
+
+            string lockPath = _filePath + ".lock";
+
+            await using FileStream lockStream = await AcquireLockAsync(lockPath);
+
+            byte[]? currentData = await LoadAsync();
+
+            if (currentData is null)
+                throw new InvalidOperationException("Vault file no longer exists.");
+
+            string currentVersion = Convert.ToHexString(SHA256.HashData(currentData));
+
+            if (!string.Equals(currentVersion, expectedVersion, StringComparison.Ordinal))
+                throw new VaultConflictException();
+
+            await SaveInternalAsync(encryptedVault, overwrite: true);
         }
 
         public async Task<byte[]?> LoadAsync()
@@ -66,7 +110,7 @@ namespace PasswordVault.Storage
                 _filePath, 
                 FileMode.Open, 
                 FileAccess.Read, 
-                FileShare.Read, 
+                FileShare.Read | FileShare.Delete, 
                 bufferSize: 8192, 
                 useAsync: true);
 
@@ -95,6 +139,26 @@ namespace PasswordVault.Storage
             }
 
             return memoryStream.ToArray();
+        }
+
+        private static async Task<FileStream> AcquireLockAsync(string lockPath)
+            {
+            const int maxAttempts = 100;
+            const int delayMilliseconds = 50;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                try
+                {
+                    return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                }
+                catch (IOException) when (attempt < maxAttempts - 1)
+                {
+                    await Task.Delay(delayMilliseconds);
+                }
+            }
+
+            throw new IOException("Could not acquire vault file lock.");
         }
     }
 }
